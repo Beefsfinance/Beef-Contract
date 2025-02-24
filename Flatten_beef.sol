@@ -3392,7 +3392,7 @@ contract BEEF is ERC20Burnable, Ownable2Step, ReentrancyGuard {
 
     //Whitelist user 
     function addToWhitelist(address[] calldata _users) external onlyOwner {
-        uint256 length = _users.length; // Gas optimization: Read calldata length once
+        uint256 length = _users.length; 
         for (uint256 i; i < length; ) {
             whitelisted[_users[i]] = true;
             unchecked { i++; } // Gas optimization: Skips overflow check (safe in loops)
