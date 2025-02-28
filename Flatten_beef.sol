@@ -2822,6 +2822,7 @@ contract BEEF is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     event LeverageFeeUpdated(uint256 leverageFee);
     event Started(bool started);
     event Liquidate(uint256 time, uint256 amount);
+    event Buy(address indexed receiver, uint256 amountBERA, uint256 amountBEEFS);
     event LoanDataUpdate(
         uint256 collateralByDate,
         uint256 borrowedByDate,
@@ -2830,7 +2831,7 @@ contract BEEF is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     );
     event SendBera(address to, uint256 amount);
 
-    constructor() ERC20("Beefs", "BEEFS") Ownable(msg.sender) {
+    constructor() ERC20("Test Beefs", "TBEEFS") Ownable(msg.sender) {
         lastLiquidationDate = getMidnightTimestamp(block.timestamp);
     }
     function setStart() public payable onlyOwner {
@@ -2903,6 +2904,8 @@ contract BEEF is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         sendBera(FEE_ADDRESS, feeAddressAmount);
 
         safetyCheck(msg.value);
+        emit Buy(receiver, msg.value, beefs);
+
     }
     function sell(uint256 beefs) external nonReentrant {
         liquidate();
