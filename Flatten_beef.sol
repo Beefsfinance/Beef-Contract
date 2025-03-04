@@ -2781,7 +2781,7 @@ contract BEEF is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     bool public isWhitelistRequired = true;
     mapping(address => bool) public whitelisted;
 
-    uint256 private constant MIN = 1000;
+    uint256 private constant MIN = 5000;
 
     uint16 public sell_fee = 975;
     uint16 public buy_fee = 975;
@@ -2802,11 +2802,11 @@ contract BEEF is ERC20Burnable, Ownable2Step, ReentrancyGuard {
     uint256 public totalMinted;
     uint256 public lastPrice = 0;
 
-    struct Loan {
-        uint256 collateral; // shares of token staked
-        uint256 borrowed; // user reward per token paid
-        uint256 endDate;
-        uint256 numberOfDays;
+     struct Loan {
+        uint256 collateral;     // Amount of BEEF tokens locked as collateral for the loan
+        uint256 borrowed;       // Amount of BERA borrowed against the collateral
+        uint256 endDate;        // The timestamp when the loan is set to expire
+        uint256 numberOfDays;   // Total duration of the loan in days
     }
 
     mapping(address => Loan) public Loans;
@@ -2872,60 +2872,63 @@ contract BEEF is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         buy_fee = amount;
         emit BuyFeeUpdated(amount);
     }
+
     function setBuyFeeLeverage(uint16 amount) external onlyOwner {
         require(amount <= 25, "leverage buy fee must be less 2.5%");
         require(amount >= 0, "leverage buy fee must be greater than 0%");
         buy_fee_leverage = amount;
         emit LeverageFeeUpdated(amount);
     }
+
     function setSellFee(uint16 amount) external onlyOwner {
         require(amount <= 992, "sell fee must be greater than FEES_SELL");
         require(amount >= 975, "sell fee must be less than 2.5%");
         sell_fee = amount;
         emit SellFeeUpdated(amount);
     }
+
     function buy(address receiver) external payable nonReentrant {
         require(!isWhitelistRequired || whitelisted[msg.sender], "Not whitelisted");
 
-        liquidate();
+        liquidate(); // Ensure any pending transactions are processed
+
         require(start, "Trading must be initialized");
+        require(receiver != address(0x0), "Receiver cannot be the zero address");
 
-        require(receiver != address(0x0), "Reciever cannot be 0x0 address");
-
-        // Mint Beefs to sender
-        // AUDIT: to user round down
         uint256 beefs = BERAtoBEEFS(msg.value);
 
+        // Mint BEEFS to receiver after applying the buy fee
         mint(receiver, (beefs * getBuyFee()) / FEE_BASE_1000);
 
-        // Team fee
         uint256 feeAddressAmount = msg.value / FEES_BUY;
-        require(feeAddressAmount > MIN, "must trade over min");
-        sendBera(FEE_ADDRESS, feeAddressAmount);
+        require(feeAddressAmount > MIN, "Transaction amount too low");
 
-        safetyCheck(msg.value);
+        sendBera(FEE_ADDRESS, feeAddressAmount); // Transfer fee to designated address
+
+        safetyCheck(msg.value); // Validate transaction integrity
+
         emit Buy(receiver, msg.value, beefs);
-
     }
-    function sell(uint256 beefs) external nonReentrant {
-        liquidate();
 
-        // Total Eth to be sent
-        // AUDIT: to user round down
+    function sell(uint256 beefs) external nonReentrant {
+        liquidate(); 
+
+        // Convert BEEFS to equivalent BERA value
         uint256 bera = BEEFStoBERA(beefs);
 
-        // Burn of JAY
+        // Calculate the sell fee amount
         uint256 feeAddressAmount = bera / FEES_SELL;
+
+        // Burn the full amount of BEEFS being sold
         _burn(msg.sender, beefs);
 
-        // Payment to sender
+        // Send the converted BERA (after deducting the sell fee) to the seller
         sendBera(msg.sender, (bera * sell_fee) / FEE_BASE_1000);
 
-        // Team fee
-
-        require(feeAddressAmount > MIN, "must trade over min");
+        // Transfer the team fee to the designated fee address
         sendBera(FEE_ADDRESS, feeAddressAmount);
 
+        // Perform a safety check to validate transaction integrity
         safetyCheck(bera);
     }
 
@@ -2934,6 +2937,7 @@ contract BEEF is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         uint256 beefs = BERAtoBEEFSNoTrade(amount);
         return ((beefs * getBuyFee()) / FEE_BASE_1000);
     }
+
     function leverageFee(
         uint256 bera,
         uint256 numberOfDays
@@ -3107,7 +3111,7 @@ contract BEEF is ERC20Burnable, Ownable2Step, ReentrancyGuard {
             _transfer(msg.sender, address(this), requireCollateralFromUser);
         }
 
-        require(feeAddressFee > MIN, "Fees must be higher than min.");
+       
         sendBera(FEE_ADDRESS, feeAddressFee);
         sendBera(msg.sender, newUserBorrow - beraFee);
 
@@ -3191,7 +3195,6 @@ contract BEEF is ERC20Burnable, Ownable2Step, ReentrancyGuard {
 
         sendBera(msg.sender, toUser);
 
-        require(feeAddressFee > MIN, "Fees must be higher than min.");
         sendBera(FEE_ADDRESS, feeAddressFee);
         subLoansByDate(borrowed, collateral, Loans[msg.sender].endDate);
 
@@ -3216,7 +3219,6 @@ contract BEEF is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         );
         require(loanFee == msg.value, "Loan extension fee incorrect");
         uint256 feeAddressFee = (loanFee * 3) / 10;
-        require(feeAddressFee > MIN, "Fees must be higher than min.");
         sendBera(FEE_ADDRESS, feeAddressFee);
         subLoansByDate(borrowed, collateral, oldEndDate);
         addLoansByDate(borrowed, collateral, newEndDate);
