@@ -2835,6 +2835,7 @@ contract BEEF is ERC20Burnable, Ownable2Step, ReentrancyGuard {
         lastLiquidationDate = getMidnightTimestamp(block.timestamp);
     }
     function setStart() public payable onlyOwner {
+        require(!start,"Beef Market already initialized")
         require(FEE_ADDRESS != address(0x0), "Must set fee address");
         uint256 teamMint = msg.value * MIN;
         require(teamMint >= 1 ether);
